@@ -1,0 +1,47 @@
+# sitemap-cache-warmer configuration. Every key is optional; command-line options override it.
+# Run: sitemap-cache-warmer warm -c examples/warmer.toml
+
+[warm]
+sitemaps = ["https://www.example.com/sitemap_index.xml"]
+
+# URL selection (regular expressions searched in the full URL)
+exclude = ['/cart/', '/checkout/', '/my-account/', '\?']
+order = "priority-lastmod"     # sitemap | priority | lastmod | priority-lastmod | url
+limit = 0                      # 0 = all
+since = ""                     # only URLs changed since a date (2026-11-01) or within an age (7d)
+
+# One request per URL and profile: desktop and mobile copies are stored separately by many caches.
+profiles = ["desktop", "mobile"]
+headers = { "X-Cache-Warmer" = "1" }
+
+# Pacing: be gentle with shared hosting.
+concurrency = 4
+rate = 5.0                     # requests per second per host
+delay = 0.0
+timeout = 30.0
+connect_timeout = 10.0
+retries = 2
+
+# Warm from the origin server itself, bypassing the CDN (curl-style host:port:address).
+# resolve = ["www.example.com:443:127.0.0.1"]
+
+# Two passes: warm, then check that every URL is now a cache HIT.
+verify = true
+verify_delay = 2.0
+min_hit_rate = 90.0            # exit 1 below this
+unknown_as_miss = false
+layer = "auto"                 # auto | cdn | varnish | litespeed | nginx | plugin | age
+
+# Reporting
+format = "table"               # table | json | csv
+output = ""                    # file path; empty = standard output
+slowest = 10
+
+# Overlapping cron runs: the second one exits with code 4.
+lock_file = "~/.cache/sitemap-cache-warmer.lock"   # "~" is expanded; avoid world-writable directories
+
+# A custom header profile, used with profiles = ["tablet"] or --profile tablet.
+[profiles.tablet.headers]
+User-Agent = "Mozilla/5.0 (iPad; CPU OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1"
+Accept = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+Accept-Encoding = "gzip, deflate, br"

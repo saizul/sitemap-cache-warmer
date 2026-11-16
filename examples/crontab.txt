@@ -1,0 +1,9 @@
+# Warm the cache every 30 minutes, desktop and mobile, then verify. Output goes to a log file.
+# The lock file makes a run that starts while the previous one is still busy exit at once (code 4).
+# Install with: crontab -e   (as an unprivileged user, not root)
+SHELL=/bin/sh
+PATH=/usr/local/bin:/usr/bin:/bin
+
+*/30 * * * * sitemap-cache-warmer warm https://www.example.com/sitemap_index.xml --profile desktop,mobile --verify --rate 5 --lock-file "$HOME/.cache/sitemap-cache-warmer.lock" --summary-only -q -f json -o "$HOME/.cache/sitemap-cache-warmer/last-run.json" >> "$HOME/.cache/sitemap-cache-warmer.log" 2>&1
+
+# After a deploy or a cache purge you can run the same command by hand, or from your deploy script.

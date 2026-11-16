@@ -1,0 +1,31 @@
+# /etc/systemd/system/sitemap-cache-warmer.service
+# Runs one warm-up pass. Started by sitemap-cache-warmer.timer.
+[Unit]
+Description=Warm the page cache from the sitemap
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# A dedicated unprivileged user; create it with: useradd --system --no-create-home cachewarmer
+User=cachewarmer
+Group=cachewarmer
+# State and lock live in /var/lib/sitemap-cache-warmer, created by systemd for this unit.
+StateDirectory=sitemap-cache-warmer
+ExecStart=/usr/local/bin/sitemap-cache-warmer warm -c /etc/sitemap-cache-warmer.toml \
+    --lock-file /var/lib/sitemap-cache-warmer/run.lock \
+    -f json -o /var/lib/sitemap-cache-warmer/last-run.json
+# Exit code 4 means the previous run was still busy: not a failure.
+SuccessExitStatus=4
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h
+# Hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes

@@ -1,0 +1,13 @@
+# /etc/systemd/system/sitemap-cache-warmer.timer
+# Enable with: systemctl daemon-reload && systemctl enable --now sitemap-cache-warmer.timer
+[Unit]
+Description=Warm the page cache every 30 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+RandomizedDelaySec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
