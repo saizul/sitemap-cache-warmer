@@ -7,7 +7,7 @@ from sitemap_cache_warmer.profiles import BUILTIN_PROFILES, Profile
 from sitemap_cache_warmer.report import Summary, summarize
 from sitemap_cache_warmer.resolve import ResolveRule, ResolvingTransport
 from sitemap_cache_warmer.selection import select
-from sitemap_cache_warmer.sitemap import SitemapEntry, parse_sitemap, read_sitemaps
+from sitemap_cache_warmer.sitemap import SitemapEntry, parse_sitemap, parse_url_list, read_sitemaps, read_url_list
 from sitemap_cache_warmer.warmer import RequestResult, UrlResult, Warmer, WarmSettings, make_client
 
 __all__ = [
@@ -33,7 +33,9 @@ __all__ = [
     "detect",
     "make_client",
     "parse_sitemap",
+    "parse_url_list",
     "read_sitemaps",
+    "read_url_list",
     "select",
     "summarize",
 ]

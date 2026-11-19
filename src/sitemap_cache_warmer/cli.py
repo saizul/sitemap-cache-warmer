@@ -20,7 +20,7 @@ from sitemap_cache_warmer.profiles import BUILTIN_PROFILES, TOOL_UA, parse_heade
 from sitemap_cache_warmer.report import format_csv, format_json, format_table, summarize
 from sitemap_cache_warmer.resolve import ResolvingTransport
 from sitemap_cache_warmer.selection import ORDERS, select
-from sitemap_cache_warmer.sitemap import read_sitemaps
+from sitemap_cache_warmer.sitemap import SitemapEntry, read_sitemaps, read_url_list
 from sitemap_cache_warmer.warmer import RequestResult, Warmer, WarmSettings, make_client
 
 log = logging.getLogger("sitemap_cache_warmer")
@@ -36,6 +36,12 @@ def _common(p: argparse.ArgumentParser, *, selection: bool = True) -> None:
     p.add_argument("-c", "--config", help="TOML configuration file")
     if selection:
         g = p.add_argument_group("URL selection")
+        g.add_argument(
+            "--urls",
+            action="append",
+            metavar="FILE",
+            help="file with one URL per line, '-' for standard input (repeatable; with or without sitemaps)",
+        )
         g.add_argument("--include", action="append", metavar="REGEX", help="only URLs matching (repeatable)")
         g.add_argument("--exclude", action="append", metavar="REGEX", help="skip URLs matching (repeatable)")
         g.add_argument("--order", choices=ORDERS, help="warm order (default: sitemap)")
@@ -124,6 +130,8 @@ def _merge(args: argparse.Namespace, config: Config) -> Config:
     """Command-line options override the config file."""
     if getattr(args, "sitemaps", None):
         config.sitemaps = list(args.sitemaps)
+    if getattr(args, "urls", None) and args.command != "check":
+        config.url_files = [*config.url_files, *args.urls]
     for name in ("include", "exclude"):
         values = getattr(args, name, None)
         if values:
@@ -198,13 +206,25 @@ def _log_result(result: RequestResult) -> None:
 
 
 async def _select_urls(config: Config, client: httpx.AsyncClient) -> tuple[list[str], int]:
-    read = await read_sitemaps(client, config.sitemaps, max_depth=config.sitemap_depth)
-    if not read.entries:
-        for source, message in read.errors:
-            log.error("sitemap %s: %s", source, message)
+    listed: list[SitemapEntry] = []
+    for path in config.url_files:
+        listed.extend(read_url_list(path))
+    entries = list(listed)
+    sitemaps_read = 0
+    if config.sitemaps:
+        read = await read_sitemaps(client, config.sitemaps, max_depth=config.sitemap_depth)
+        if not read.entries:
+            for source, message in read.errors:
+                log.error("sitemap %s: %s", source, message)
+            if not listed:
+                return [], EXIT_NO_URLS
+        entries.extend(read.entries)
+        sitemaps_read = len(read.sitemaps_read)
+    if not entries:
+        log.error("the URL list(s) are empty")
         return [], EXIT_NO_URLS
     selection = select(
-        read.entries,
+        entries,
         include=config.include,
         exclude=config.exclude,
         order=config.order,
@@ -212,14 +232,17 @@ async def _select_urls(config: Config, client: httpx.AsyncClient) -> tuple[list[
         since=config.since_datetime(),
     )
     log.info(
-        "%d sitemap(s), %d entries: %d selected, %d duplicate, %d excluded, %d older than --since, %d over --limit",
-        len(read.sitemaps_read),
-        len(read.entries),
+        "%d sitemap(s), %d listed URL(s), %d entries: %d selected, %d duplicate, %d excluded, %d older than --since, "
+        "%d over --limit, %d invalid",
+        sitemaps_read,
+        len(listed),
+        len(entries),
         len(selection.urls),
         selection.duplicates,
         selection.excluded,
         selection.too_old,
         selection.over_limit,
+        selection.invalid,
     )
     if not selection.urls:
         log.error("no URL left after filtering")
@@ -330,8 +353,8 @@ def main(argv: list[str] | None = None, *, transport: httpx.AsyncBaseTransport |
     try:
         config = load_config(args.config) if args.config else Config()
         config = _merge(args, config)
-        if args.command in ("warm", "urls") and not config.sitemaps:
-            log.error("give at least one sitemap URL or file (or set warm.sitemaps in the config)")
+        if args.command in ("warm", "urls") and not (config.sitemaps or config.url_files):
+            log.error("give at least one sitemap URL or file, or --urls FILE (or set warm.sitemaps in the config)")
             return EXIT_USAGE
         if args.command == "check":
             resolve_profiles(config.profiles, config.custom_profiles)

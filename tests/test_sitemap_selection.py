@@ -167,3 +167,43 @@ class TestSelect:
 def test_normalize_url():
     assert normalize_url("HTTPS://Shop.Example.com:443/a?b=1#x") == "https://shop.example.com/a?b=1"
     assert normalize_url("http://x.io:8080") == "http://x.io:8080/"
+
+
+def test_parse_url_list_skips_comments_and_extra_fields():
+    from sitemap_cache_warmer.sitemap import parse_url_list
+
+    entries = parse_url_list(
+        "\ufeff# deploy list\n\nhttps://x.io/a\nhttps://x.io/b 200 OK\n  https://x.io/c\tTitle\n", "l.txt"
+    )
+    assert [e.loc for e in entries] == ["https://x.io/a", "https://x.io/b", "https://x.io/c"]
+    assert all(e.listed and e.sitemap == "l.txt" and e.lastmod is None for e in entries)
+    assert [e.position for e in entries] == [0, 1, 2]
+
+
+def test_read_url_list_file_and_stdin(tmp_path):
+    import io
+
+    from sitemap_cache_warmer.sitemap import read_url_list
+
+    path = tmp_path / "urls.txt"
+    path.write_text("https://x.io/a\n", encoding="utf-8")
+    assert [e.loc for e in read_url_list(str(path))] == ["https://x.io/a"]
+    assert [e.loc for e in read_url_list("-", io.StringIO("https://x.io/s\n"))] == ["https://x.io/s"]
+
+
+def test_listed_urls_survive_since():
+    from datetime import datetime, timezone
+
+    from sitemap_cache_warmer.selection import select
+    from sitemap_cache_warmer.sitemap import SitemapEntry
+
+    since = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    entries = [
+        SitemapEntry("https://x.io/listed", listed=True),
+        SitemapEntry("https://x.io/old", lastmod=datetime(2026, 1, 1, tzinfo=timezone.utc)),
+        SitemapEntry("https://x.io/new", lastmod=datetime(2026, 11, 10, tzinfo=timezone.utc)),
+        SitemapEntry("ftp://x.io/bad", listed=True),
+    ]
+    result = select(entries, since=since)
+    assert [e.loc for e in result.urls] == ["https://x.io/listed", "https://x.io/new"]
+    assert result.too_old == 1 and result.invalid == 1

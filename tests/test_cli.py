@@ -131,6 +131,42 @@ class TestWarmCommand:
         assert f"{HOST}/about/" in capsys.readouterr().out
 
 
+class TestUrlLists:
+    def test_url_list_without_sitemap(self, cache: FakeCache, tmp_path, capsys):
+        path = tmp_path / "deploy.txt"
+        path.write_text(f"# changed pages\n{HOST}/about/\n{HOST}/blog/hello/\n{HOST}/about/\n", encoding="utf-8")
+        assert main(["warm", "--urls", str(path), "-f", "json"], transport=cache.transport) == EXIT_OK
+        data = json.loads(capsys.readouterr().out)
+        assert [r["url"] for r in data["results"]] == [f"{HOST}/about/", f"{HOST}/blog/hello/"]
+        assert not any(r.url.path.endswith((".xml", ".gz")) for r in cache.requests)
+
+    def test_url_list_with_sitemap_comes_first_and_ignores_since(self, cache: FakeCache, tmp_path, capsys):
+        path = tmp_path / "deploy.txt"
+        path.write_text(f"{HOST}/contact/\n", encoding="utf-8")
+        code = main(["urls", INDEX, "--urls", str(path), "--since", "2026-11-11"], transport=cache.transport)
+        assert code == EXIT_OK
+        assert capsys.readouterr().out.splitlines() == [f"{HOST}/contact/", f"{HOST}/cart/", f"{HOST}/blog/hello/"]
+
+    def test_url_list_filters_and_stdin(self, cache: FakeCache, capsys, monkeypatch):
+        monkeypatch.setattr("sys.stdin", io.StringIO(f"{HOST}/about/\n{HOST}/cart/\n"))
+        assert main(["urls", "--urls", "-", "--exclude", "/cart/"], transport=cache.transport) == EXIT_OK
+        assert capsys.readouterr().out.splitlines() == [f"{HOST}/about/"]
+
+    def test_url_list_errors(self, cache: FakeCache, tmp_path):
+        assert main(["warm", "--urls", str(tmp_path / "missing.txt")], transport=cache.transport) == EXIT_USAGE
+        empty = tmp_path / "empty.txt"
+        empty.write_text("# nothing\n", encoding="utf-8")
+        assert main(["warm", "--urls", str(empty)], transport=cache.transport) == EXIT_NO_URLS
+
+    def test_url_files_in_config(self, cache: FakeCache, tmp_path, capsys):
+        path = tmp_path / "deploy.txt"
+        path.write_text(f"{HOST}/about/\n", encoding="utf-8")
+        config = tmp_path / "w.toml"
+        config.write_text(f"[warm]\nurl_files = '{path}'\n", encoding="utf-8")
+        assert main(["urls", "-c", str(config)], transport=cache.transport) == EXIT_OK
+        assert capsys.readouterr().out.splitlines() == [f"{HOST}/about/"]
+
+
 def test_urls_command(cache: FakeCache, capsys):
     code = main(["urls", INDEX, "--order", "lastmod", "--exclude", "/cart/"], transport=cache.transport)
     assert code == EXIT_OK

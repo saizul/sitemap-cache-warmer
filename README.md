@@ -61,6 +61,8 @@ slowest:
 
 - **Sitemaps**: `<sitemapindex>` and `<urlset>`, nested indexes, gzip (`.xml.gz`), remote URLs or local files,
   with size limits and entity-expansion protection.
+- **URL lists**: `--urls FILE` (or `-` for standard input) warms a plain list of URLs, alone or together with
+  sitemaps. Listed URLs come first, go through the same filters, and are kept by `--since`.
 - **Selection**: de-duplication across sitemaps, include and exclude regular expressions, order by sitemap,
   priority, lastmod, priority then lastmod, or URL, a `--limit`, and `--since 7d` / `--since 2026-11-01` to warm
   only recently changed pages.
@@ -132,8 +134,8 @@ as an unprivileged user (UID 10001) and includes Brotli support.
 ## Usage
 
 ```text
-sitemap-cache-warmer warm  [SITEMAP ...] [-c FILE] [selection] [requests] [--verify] [output] [--lock-file PATH]
-sitemap-cache-warmer urls  [SITEMAP ...] [-c FILE] [selection]
+sitemap-cache-warmer warm  [SITEMAP ...] [--urls FILE] [-c FILE] [selection] [requests] [--verify] [output] [--lock-file PATH]
+sitemap-cache-warmer urls  [SITEMAP ...] [--urls FILE] [-c FILE] [selection]
 sitemap-cache-warmer check URL ... [--twice] [requests]
 ```
 
@@ -153,6 +155,11 @@ $ sitemap-cache-warmer warm https://www.example.com/sitemap.xml --since 1d --ord
 $ sitemap-cache-warmer warm https://www.example.com/sitemap.xml --exclude '/(cart|checkout|my-account)/' \
     --exclude '\?' --order priority --limit 200
 
+# Warm a list of URLs (changed pages from a deploy script), on its own or before the sitemap
+$ sitemap-cache-warmer warm --urls changed-urls.txt --verify
+$ printf '%s\n' https://www.example.com/ https://www.example.com/pricing/ | sitemap-cache-warmer warm --urls -
+$ sitemap-cache-warmer warm https://www.example.com/sitemap.xml --urls priority-pages.txt --since 1d
+
 # What would be warmed? (no page requests)
 $ sitemap-cache-warmer urls https://www.example.com/sitemap.xml --order priority --limit 20
 
@@ -162,6 +169,7 @@ $ sitemap-cache-warmer check https://www.example.com/ --twice -v
 
 | Option | Meaning |
 | --- | --- |
+| `--urls FILE` | one URL per line (`#` comments, extra fields after the URL ignored); `-` reads standard input; repeatable |
 | `--include RE`, `--exclude RE` | regular expressions searched in the full URL (repeatable) |
 | `--order` | `sitemap` (default), `priority`, `lastmod`, `priority-lastmod`, `url` |
 | `--limit N` | warm at most N URLs (after ordering) |
@@ -277,6 +285,7 @@ All options can be set in a TOML file under `[warm]`. Options on the command lin
 ```toml
 [warm]
 sitemaps = ["https://www.example.com/sitemap_index.xml"]
+url_files = ["priority-pages.txt"]   # optional URL lists, warmed first
 exclude = ['/cart/', '/checkout/', '/my-account/', '\?']
 order = "priority-lastmod"
 profiles = ["desktop", "mobile"]
@@ -399,6 +408,8 @@ marks the unit as failed, which your monitoring can alert on (`systemctl --faile
 
 [`examples/after-deploy.sh`](examples/after-deploy.sh) first warms the pages changed in the last day, then
 everything, with a verify pass and a minimum hit rate, so a deploy pipeline can fail when caching broke.
+If your deploy knows exactly which pages changed, write them to a file (or pipe them) and pass `--urls FILE`:
+those URLs are warmed without reading any sitemap.
 
 ## Library use
 
@@ -484,7 +495,8 @@ See [SECURITY.md](SECURITY.md) for reporting a vulnerability.
 ## Contributing
 
 Bug reports and pull requests are welcome, especially header or comment formats from caches that aren't covered
-yet. See [CONTRIBUTING.md](CONTRIBUTING.md), and [CHANGELOG.md](CHANGELOG.md) for the release history.
+yet. See [CONTRIBUTING.md](CONTRIBUTING.md), the [code of conduct](CODE_OF_CONDUCT.md), and
+[CHANGELOG.md](CHANGELOG.md) for the release history.
 
 ## License
 
