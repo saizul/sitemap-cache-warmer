@@ -3,6 +3,7 @@
 
 [warm]
 sitemaps = ["https://www.example.com/sitemap_index.xml"]
+url_files = []                 # URL lists (one URL per line), warmed before the sitemap URLs
 
 # URL selection (regular expressions searched in the full URL)
 exclude = ['/cart/', '/checkout/', '/my-account/', '\?']

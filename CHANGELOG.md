@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `warm --urls FILE` and `urls --urls FILE` (repeatable, `-` reads standard input; config key `url_files`): warm a
+  plain list of URLs, on its own or together with sitemaps. Lines are one URL each, with `#` comments and extra
+  fields after the URL ignored. Listed URLs come before sitemap URLs, are de-duplicated and filtered like them, and
+  are kept by `--since` because they have no lastmod. Library: `parse_url_list()`, `read_url_list()` and
+  `SitemapEntry.listed`.
+- The selection log line also counts listed and invalid URLs.
+- A code of conduct, issue forms and a pull request template.
+
 ## [0.1.0] - 2026-11-16
 
 ### Added

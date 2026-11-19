@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import sys
 import zlib
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TextIO
 from xml.etree import ElementTree
 
 import httpx
@@ -29,6 +31,30 @@ class SitemapEntry:
     changefreq: str | None = None
     sitemap: str = ""
     position: int = 0
+    #: True for URLs from a URL list (``--urls``): they have no lastmod and are never dropped by ``--since``.
+    listed: bool = False
+
+
+def parse_url_list(text: str, source: str = "") -> list[SitemapEntry]:
+    """Entries from a plain URL list: one URL per line, blank lines and ``#`` comments skipped.
+
+    Only the first whitespace-separated field of a line is used, so ``https://x.io/a 200`` style exports and
+    ``url<TAB>title`` lists work too.
+    """
+    entries: list[SitemapEntry] = []
+    for line in text.splitlines():
+        line = line.strip().lstrip("\ufeff")
+        if not line or line.startswith("#"):
+            continue
+        entries.append(SitemapEntry(line.split()[0], sitemap=source, position=len(entries), listed=True))
+    return entries
+
+
+def read_url_list(path: str, stdin: TextIO | None = None) -> list[SitemapEntry]:
+    """Read a URL list file; ``-`` reads standard input."""
+    if path == "-":
+        return parse_url_list((stdin or sys.stdin).read(), "<stdin>")
+    return parse_url_list(Path(path).expanduser().read_text(encoding="utf-8-sig"), path)
 
 
 @dataclass

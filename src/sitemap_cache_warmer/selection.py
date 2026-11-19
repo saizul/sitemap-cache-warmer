@@ -48,6 +48,7 @@ def select(
 
     ``include``/``exclude`` are regular expressions searched in the full URL. ``order`` is one of :data:`ORDERS`;
     ``priority`` and ``lastmod`` sort descending (missing values last) and keep the sitemap order for ties.
+    Entries from URL lists (``entry.listed``) are kept by ``since``: they have no lastmod to compare.
     """
     if order not in ORDERS:
         raise ValueError(f"order must be one of {', '.join(ORDERS)}")
@@ -68,7 +69,7 @@ def select(
         if (inc and not any(p.search(entry.loc) for p in inc)) or any(p.search(entry.loc) for p in exc):
             result.excluded += 1
             continue
-        if since is not None and (entry.lastmod is None or entry.lastmod < since):
+        if since is not None and not entry.listed and (entry.lastmod is None or entry.lastmod < since):
             result.too_old += 1
             continue
         kept.append((index, entry))

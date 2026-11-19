@@ -29,6 +29,7 @@ class ConfigError(ValueError):
 @dataclass
 class Config:
     sitemaps: list[str] = field(default_factory=list)
+    url_files: list[str] = field(default_factory=list)
     include: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
     order: str = "sitemap"
@@ -130,7 +131,7 @@ def config_from_dict(data: dict[str, Any]) -> Config:
     config = Config()
     for key, value in warm.items():
         default = getattr(config, key)
-        if isinstance(value, str) and key in ("sitemaps", "include", "exclude", "profiles", "resolve"):
+        if isinstance(value, str) and key in ("sitemaps", "url_files", "include", "exclude", "profiles", "resolve"):
             value = [value]
         if isinstance(default, bool):
             if not isinstance(value, bool):
